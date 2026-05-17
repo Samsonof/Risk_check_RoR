@@ -1,0 +1,278 @@
+<% kyc_is_recent = risk_case[:kyc_l1_hours_before_withdrawal] < 36 %>
+<% first_deposit_is_recent = risk_case[:days_after_first_deposit] < 7 %>
+<% status_class = score["decision"].to_s %>
+
+<section
+  class="decision-stack grid gap-4"
+  data-controller="risk-refresh"
+  data-decision="<%= status_class %>"
+  data-risk-refresh-url-value="<%= score_path(risk_case[:id], locale: I18n.locale) %>">
+  <div class="rounded-lg border border-line bg-white p-5 shadow-soft">
+    <div class="flex items-start justify-between gap-4 max-lg:grid">
+      <div>
+        <span class="block text-xs font-extrabold uppercase text-muted"><%= risk_case[:request_id] %> · <%= risk_case[:id] %></span>
+        <h3 class="m-0 mt-1 text-2xl font-extrabold"><%= risk_case[:name] %></h3>
+        <p class="m-0 mt-1 text-muted"><%= risk_case[:email] %> · <%= risk_case[:registration_city] %>, <%= risk_case[:registration_country] %></p>
+      </div>
+
+      <div class="grid justify-items-center gap-2">
+        <div class="score-circle" data-risk-refresh-target="meter" style="--score-fill: <%= score["risk_score"] %>%">
+          <span data-risk-refresh-target="score"><%= score["risk_score"] %></span>
+        </div>
+        <small class="text-sm text-muted"><%= t("dashboard.auto_refresh") %></small>
+      </div>
+    </div>
+
+    <div class="decision-banner mt-4 grid grid-cols-3 gap-3 rounded-lg p-4 max-md:grid-cols-1 <%= status_class %>">
+      <div>
+        <span class="block text-xs font-extrabold uppercase text-muted"><%= t("dashboard.python_decision") %></span>
+        <strong class="uppercase" data-risk-refresh-target="decision"><%= score["decision"] %></strong>
+      </div>
+      <div>
+        <span class="block text-xs font-extrabold uppercase text-muted"><%= t("dashboard.engine") %></span>
+        <strong class="uppercase" data-risk-refresh-target="engine"><%= score["engine_status"] %></strong>
+      </div>
+      <div>
+        <span class="block text-xs font-extrabold uppercase text-muted"><%= t("dashboard.last_check") %></span>
+        <strong data-risk-refresh-target="checkedAt"><%= score["checked_at"] %></strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-3 max-lg:grid-cols-1">
+    <article class="rounded-lg border border-line bg-white p-4 shadow-soft">
+      <span class="block text-xs font-bold text-muted"><%= t("dashboard.kpis.trades") %></span>
+      <strong class="mt-1 block text-2xl font-extrabold"><%= risk_case[:trades_count] %></strong>
+      <small class="text-sm text-muted"><%= risk_case[:active_days] %> <%= t("dashboard.active_days") %></small>
+    </article>
+    <article class="rounded-lg border border-line bg-white p-4 shadow-soft">
+      <span class="block text-xs font-bold text-muted"><%= t("dashboard.kpis.volume") %></span>
+      <strong class="mt-1 block text-2xl font-extrabold"><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:trades_volume]) %></strong>
+      <small class="text-sm text-muted"><%= t("dashboard.from_trading_api") %></small>
+    </article>
+    <article class="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-soft">
+      <span class="block text-xs font-bold text-muted"><%= t("dashboard.kpis.withdrawal") %></span>
+      <strong class="mt-1 block text-2xl font-extrabold"><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:withdrawal_amount]) %></strong>
+      <small class="text-sm text-slate-700"><%= risk_case[:withdrawal_method] %> · <%= risk_case[:withdrawal_destination] %></small>
+    </article>
+  </div>
+
+  <div class="grid grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)] gap-4 max-lg:grid-cols-1">
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft">
+      <div class="mb-4">
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.client_context") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.client_context_note") %></span>
+      </div>
+
+      <div class="grid gap-3">
+        <div class="rounded-lg border border-line bg-slate-50 p-3">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.registration_ip") %></span>
+          <strong class="mt-1 block"><%= risk_case[:registration_ip] %></strong>
+          <small class="text-muted"><%= risk_case[:registration_country] %></small>
+        </div>
+        <div class="rounded-lg border border-line bg-slate-50 p-3">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.withdrawal_geo") %></span>
+          <strong class="mt-1 block"><%= risk_case[:withdrawal_geo] %></strong>
+          <small class="text-muted"><%= risk_case[:withdrawal_method] %></small>
+        </div>
+        <div class="rounded-lg border border-line bg-slate-50 p-3">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.phone_bank") %></span>
+          <strong class="mt-1 block"><%= risk_case[:phone_country] %> / <%= risk_case[:bank_country] %></strong>
+          <small class="text-muted"><%= t("dashboard.country_match_check") %></small>
+        </div>
+        <div class="rounded-lg border border-line bg-slate-50 p-3">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.payment_pattern") %></span>
+          <strong class="mt-1 block"><%= RiskCaseStore.localized(risk_case[:payment_attempts_pattern]) %></strong>
+          <small class="text-muted"><%= t("dashboard.last_month") %></small>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft">
+      <div class="mb-4">
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.kyc_timing") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.kyc_note") %></span>
+      </div>
+
+      <div class="grid gap-3">
+        <div class="rounded-lg border p-3 <%= risk_case[:kyc_level_2] ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50' %>">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.kyc_l2") %></span>
+          <strong class="mt-1 block text-xl"><%= risk_case[:kyc_level_2] ? t("common.yes") : t("common.no") %></strong>
+        </div>
+        <div class="rounded-lg border p-3 <%= risk_case[:deposits_before_kyc_l1] ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50' %>">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.deposits_before_kyc") %></span>
+          <strong class="mt-1 block text-xl"><%= risk_case[:deposits_before_kyc_l1] ? t("common.yes") : t("common.no") %></strong>
+        </div>
+        <div class="rounded-lg border p-3 <%= kyc_is_recent ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50' %>">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.kyc_l1_before_withdrawal") %></span>
+          <strong class="mt-1 block text-2xl"><%= risk_case[:kyc_l1_hours_before_withdrawal] %>h</strong>
+          <% if kyc_is_recent %>
+            <small class="text-muted"><%= t("dashboard.less_than_36h") %></small>
+          <% end %>
+        </div>
+        <div class="rounded-lg border p-3 <%= first_deposit_is_recent ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50' %>">
+          <span class="block text-xs font-bold text-muted"><%= t("dashboard.after_first_deposit") %></span>
+          <strong class="mt-1 block text-2xl"><%= risk_case[:days_after_first_deposit] %>d</strong>
+          <% if first_deposit_is_recent %>
+            <small class="text-muted"><%= t("dashboard.less_than_week") %></small>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)] gap-4 max-lg:grid-cols-1">
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft">
+      <div class="mb-4">
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.deposit_methods") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.deposit_methods_note") %></span>
+      </div>
+
+      <div class="grid gap-3">
+        <% risk_case[:deposit_methods].each do |method| %>
+          <div class="grid grid-cols-[1fr_auto_auto] items-center gap-4 rounded-lg border border-line bg-slate-50 p-3 max-md:grid-cols-1">
+            <div>
+              <strong><%= method[:label] %></strong>
+              <small class="block text-muted"><%= method[:note] %></small>
+            </div>
+            <b><%= method[:count] %></b>
+            <b><%= risk_case[:currency] %> <%= number_with_delimiter(method[:amount]) %></b>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="operation-locks-section" data-controller="lock-toggle">
+      <div class="mb-4 flex items-start justify-between gap-3 max-md:grid">
+        <div>
+          <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.operation_locks") %></h3>
+          <span class="text-sm text-muted"><%= t("dashboard.operation_locks_note") %></span>
+        </div>
+        <span class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700"><%= t("dashboard.superadmin_mode") %></span>
+      </div>
+
+      <div class="grid gap-3">
+        <% %w[withdrawal deposits open_trades].each do |lock| %>
+          <% locked = risk_case[:locks].include?(lock) %>
+          <div class="lock-row flex items-center justify-between gap-3 rounded-lg border p-3 <%= locked ? 'locked' : 'clear' %>" data-locked="<%= locked %>">
+            <div>
+              <span class="block text-xs font-bold text-muted"><%= t("locks.#{lock}") %></span>
+              <strong class="uppercase" data-lock-toggle-target="status"><%= locked ? t("dashboard.locked") : t("dashboard.clear") %></strong>
+            </div>
+            <button
+              class="lock-button <%= locked ? 'locked' : 'clear' %>"
+              type="button"
+              data-action="lock-toggle#toggle"
+              data-lock-toggle-locked-param="<%= t("dashboard.locked") %>"
+              data-lock-toggle-clear-param="<%= t("dashboard.clear") %>"
+              data-lock-toggle-release-param="<%= t("dashboard.release_lock") %>"
+              data-lock-toggle-apply-param="<%= t("dashboard.apply_lock") %>">
+              <%= locked ? t("dashboard.release_lock") : t("dashboard.apply_lock") %>
+            </button>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  </div>
+
+  <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="approval-flow-section">
+    <div class="mb-4 flex items-start justify-between gap-3 max-lg:grid">
+      <div>
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.approval_flow") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.approval_note") %></span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" type="button"><%= t("dashboard.request_more_info") %></button>
+        <button class="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white hover:bg-blue-700" type="button"><%= t("dashboard.superadmin_override") %></button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+      <% risk_case[:approvals].each do |approval| %>
+        <div class="approval-card <%= approval[:status].tr('_', '-') %> rounded-lg border p-3">
+          <span class="block text-xs font-bold text-muted"><%= approval[:role] %></span>
+          <strong class="mt-1 block"><%= approval[:person] %></strong>
+          <small class="text-muted"><%= t("approval_status.#{approval[:status]}") %></small>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="risk-triggers-section">
+    <div class="mb-4">
+      <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.risk_triggers") %></h3>
+      <span class="text-sm text-muted"><%= t("dashboard.risk_triggers_note") %></span>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+      <% risk_case[:triggers].each do |trigger| %>
+        <span class="rounded-lg bg-rose-50 px-3 py-2 text-sm font-extrabold text-rose-700"><%= t("triggers.#{trigger}", default: trigger.humanize) %></span>
+      <% end %>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)] gap-4 max-lg:grid-cols-1">
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="risk-rules-section">
+      <div class="mb-4">
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.active_rules") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.active_rules_note") %></span>
+      </div>
+
+      <div class="grid gap-3">
+        <% %w[multi_registration geo_mismatch country_mismatch shared_instrument decreasing_failed_payments kyc_timing recent_security_change crypto_wallet_reuse].each do |rule| %>
+          <div class="rounded-lg border border-line bg-slate-50 p-3 text-sm font-bold"><%= t("rules.#{rule}") %></div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="intercom-section">
+      <div class="mb-4">
+        <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.intercom") %></h3>
+        <span class="text-sm text-muted"><%= t("dashboard.intercom_note") %></span>
+      </div>
+
+      <div class="mb-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
+        <span class="block text-xs font-bold text-muted"><%= t("dashboard.support_alert") %></span>
+        <strong class="mt-1 block"><%= RiskCaseStore.localized(risk_case[:intercom_alert]) %></strong>
+      </div>
+
+      <div class="grid gap-3">
+        <div class="flex justify-between gap-3 rounded-lg border border-line bg-slate-50 p-3"><span class="text-sm font-bold text-muted"><%= t("roles.support") %></span><strong><%= t("access.support") %></strong></div>
+        <div class="flex justify-between gap-3 rounded-lg border border-line bg-slate-50 p-3"><span class="text-sm font-bold text-muted"><%= t("roles.risk") %></span><strong><%= t("access.risk") %></strong></div>
+        <div class="flex justify-between gap-3 rounded-lg border border-line bg-slate-50 p-3"><span class="text-sm font-bold text-muted"><%= t("roles.finance") %></span><strong><%= t("access.finance") %></strong></div>
+        <div class="flex justify-between gap-3 rounded-lg border border-line bg-slate-50 p-3"><span class="text-sm font-bold text-muted"><%= t("roles.superadmin") %></span><strong><%= t("access.superadmin") %></strong></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="month-history-section">
+    <div class="mb-4">
+      <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.month_history") %></h3>
+      <span class="text-sm text-muted"><%= t("dashboard.month_history_note") %></span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr class="border-b border-line text-xs uppercase text-muted">
+            <th class="px-3 py-2"><%= t("table.date") %></th>
+            <th class="px-3 py-2"><%= t("table.type") %></th>
+            <th class="px-3 py-2"><%= t("table.method") %></th>
+            <th class="px-3 py-2"><%= t("table.amount") %></th>
+            <th class="px-3 py-2"><%= t("table.status") %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% risk_case[:month_history].each do |event| %>
+            <% warning = event.last.include?("manual") || event.last.include?("before") || event.last.include?("declined") || event.last.include?("foreign") || event.last.include?("shared") %>
+            <tr class="border-b border-line <%= warning ? 'bg-amber-50' : '' %>">
+              <% event.each do |cell| %>
+                <td class="px-3 py-3"><%= cell %></td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

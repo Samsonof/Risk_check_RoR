@@ -1,0 +1,138 @@
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+}
+
+#queue-section,
+#operation-locks-section,
+#approval-flow-section,
+#risk-triggers-section,
+#risk-rules-section,
+#intercom-section,
+#month-history-section {
+  scroll-margin-top: 24px;
+}
+
+.side-nav a {
+  border-radius: 8px;
+  color: #d7deea;
+  font-weight: 700;
+  padding: 9px 10px;
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.side-nav a:hover,
+.side-nav a.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.score-circle {
+  --score-color: #a96509;
+  width: 100px;
+  height: 100px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--score-color) var(--score-fill), #e8edf4 0);
+  font-size: 28px;
+  font-weight: 800;
+  position: relative;
+}
+
+.decision-stack[data-decision="block"] .score-circle {
+  --score-color: #b4232a;
+}
+
+.decision-stack[data-decision="allow"] .score-circle {
+  --score-color: #14805e;
+}
+
+.score-circle::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  background: #ffffff;
+  border-radius: 999px;
+}
+
+.score-circle span {
+  position: relative;
+  z-index: 1;
+}
+
+.decision-banner {
+  background: #fff4df;
+}
+
+.decision-banner.block {
+  background: #ffe8e8;
+}
+
+.decision-banner.allow {
+  background: #e8f7f0;
+}
+
+.lock-row.locked {
+  background: #ffe8e8;
+  border-color: #ffbbbb;
+}
+
+.lock-row.clear {
+  background: #e8f7f0;
+  border-color: #bce8d2;
+}
+
+.lock-button {
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+.lock-button.locked {
+  border-color: #f3a8ad;
+  color: #b4232a;
+}
+
+.lock-button.locked:hover {
+  background: #fff1f2;
+}
+
+.lock-button.clear {
+  border-color: #9fd8bd;
+  color: #14805e;
+}
+
+.lock-button.clear:hover {
+  background: #ecfdf5;
+}
+
+.approval-card {
+  background: #f9fbfe;
+  border-left: 4px solid #a96509;
+}
+
+.approval-card.approved {
+  background: #e8f7f0;
+  border-left-color: #14805e;
+}
+
+.approval-card.pending {
+  background: #fff4df;
+}
+
+.approval-card.override-available {
+  background: #f0eaff;
+  border-left-color: #6f4bb2;
+}
+
+.approval-card.not-required {
+  border-left-color: #9aa4b2;
+}

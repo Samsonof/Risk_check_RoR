@@ -1,0 +1,109 @@
+<% content_for :title, "RiskOps Tailwind Prototype" %>
+<% blocked_count = @cases.count { |risk_case| risk_case[:locks].any? } %>
+<% pending_count = @cases.sum { |risk_case| risk_case[:approvals].count { |approval| approval[:status] == "pending" } } %>
+<% total_withdrawal = @cases.sum { |risk_case| risk_case[:withdrawal_amount] } %>
+
+<div class="min-h-screen bg-slate-100 text-ink lg:flex" data-controller="section-nav">
+  <aside class="sticky top-0 z-20 flex h-screen w-[280px] shrink-0 flex-col gap-5 overflow-y-auto bg-navy px-5 py-6 text-white max-lg:static max-lg:h-auto max-lg:w-full">
+    <div class="flex items-center gap-3">
+      <div class="grid h-11 w-11 place-items-center rounded-lg bg-amber-400 font-extrabold text-slate-900">RO</div>
+      <div>
+        <h1 class="m-0 text-lg font-extrabold">RiskOps</h1>
+        <p class="m-0 text-sm text-slate-300"><%= t("dashboard.stack") %></p>
+      </div>
+    </div>
+
+    <nav class="side-nav grid gap-1" aria-label="Risk workspace navigation">
+      <a class="active" href="#queue-section" data-section-nav-target="link"><%= t("dashboard.nav.queue") %></a>
+      <a href="#operation-locks-section" data-section-nav-target="link"><%= t("dashboard.nav.blocks") %></a>
+      <a href="#approval-flow-section" data-section-nav-target="link"><%= t("dashboard.nav.access") %></a>
+      <a href="#risk-rules-section" data-section-nav-target="link"><%= t("dashboard.nav.rules") %></a>
+      <a href="#intercom-section" data-section-nav-target="link"><%= t("dashboard.nav.intercom") %></a>
+      <a href="#month-history-section" data-section-nav-target="link"><%= t("dashboard.nav.history") %></a>
+    </nav>
+
+    <div class="rounded-lg border border-white/10 bg-white/10 p-4">
+      <span class="block text-xs font-extrabold uppercase text-slate-300"><%= t("dashboard.stack") %></span>
+      <strong class="mt-1 block">Rails + Tailwind</strong>
+      <small class="mt-1 block text-sm text-slate-300"><%= t("dashboard.hotwire_note") %></small>
+    </div>
+
+    <div class="rounded-lg border border-white/10 bg-white/10 p-4">
+      <span class="block text-xs font-extrabold uppercase text-slate-300"><%= t("dashboard.risk_engine") %></span>
+      <strong class="mt-1 block">Python API</strong>
+      <small class="mt-1 block text-sm text-slate-300"><%= t("dashboard.python_note") %></small>
+    </div>
+  </aside>
+
+  <main class="min-w-0 flex-1 p-6">
+    <header class="mb-4 flex items-start justify-between gap-4 max-xl:grid">
+      <div>
+        <span class="block text-xs font-extrabold uppercase text-muted"><%= t("dashboard.workspace") %></span>
+        <h2 class="m-0 mt-1 text-3xl font-extrabold tracking-normal"><%= t("dashboard.title") %></h2>
+        <p class="m-0 mt-1 text-muted"><%= t("dashboard.subtitle") %></p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="inline-flex rounded-lg border border-line bg-white p-1" aria-label="Language selector">
+          <% { en: "EN", es: "ES", ru: "RU" }.each do |locale, label| %>
+            <%= link_to label, url_for(request.query_parameters.merge(locale: locale)), class: "rounded-md px-3 py-2 text-sm font-extrabold #{I18n.locale == locale ? 'bg-brand text-white' : 'text-muted hover:bg-slate-100'}" %>
+          <% end %>
+        </div>
+        <span class="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-sm font-extrabold text-emerald-700">
+          <span class="h-2 w-2 rounded-full bg-emerald-600"></span>
+          <%= t("dashboard.live") %>
+        </span>
+      </div>
+    </header>
+
+    <section class="mb-4 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1" aria-label="Operational summary">
+      <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+        <span class="block text-xs font-bold text-muted"><%= t("dashboard.summary.requests") %></span>
+        <strong class="mt-1 block text-2xl font-extrabold"><%= @cases.size %></strong>
+      </div>
+      <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+        <span class="block text-xs font-bold text-muted"><%= t("dashboard.summary.blocked") %></span>
+        <strong class="mt-1 block text-2xl font-extrabold"><%= blocked_count %></strong>
+      </div>
+      <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+        <span class="block text-xs font-bold text-muted"><%= t("dashboard.summary.pending") %></span>
+        <strong class="mt-1 block text-2xl font-extrabold"><%= pending_count %></strong>
+      </div>
+      <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+        <span class="block text-xs font-bold text-muted"><%= t("dashboard.summary.amount") %></span>
+        <strong class="mt-1 block text-2xl font-extrabold"><%= number_with_delimiter(total_withdrawal) %></strong>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-[380px_minmax(0,1fr)] items-start gap-4 max-xl:grid-cols-1">
+      <section class="rounded-lg border border-line bg-white p-5 shadow-soft" id="queue-section">
+        <div class="mb-4">
+          <h3 class="m-0 text-lg font-extrabold"><%= t("dashboard.queue") %></h3>
+          <span class="text-sm text-muted"><%= t("dashboard.queue_note") %></span>
+        </div>
+
+        <div class="grid gap-3">
+          <% @cases.each do |risk_case| %>
+            <%= link_to case_panel_path(risk_case[:id], locale: I18n.locale), class: "group grid gap-2 rounded-lg border p-4 text-ink no-underline transition #{risk_case[:id] == @selected[:id] ? 'border-brand bg-blue-50' : 'border-line bg-white hover:border-brand hover:bg-blue-50'}", data: { turbo_frame: "decision_panel" } do %>
+              <b class="flex justify-between gap-3">
+                <span><%= risk_case[:name] %></span>
+                <span><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:withdrawal_amount]) %></span>
+              </b>
+              <small class="text-muted"><%= risk_case[:request_id] %> · <%= risk_case[:withdrawal_method] %></small>
+              <small class="text-muted"><%= risk_case[:trades_count] %> <%= t("dashboard.trades") %> · <%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:trades_volume]) %></small>
+              <span class="flex flex-wrap gap-1">
+                <% risk_case[:triggers].first(3).each do |trigger| %>
+                  <em class="rounded-md bg-slate-100 px-2 py-1 text-xs not-italic font-extrabold text-slate-700"><%= t("triggers.#{trigger}", default: trigger.humanize) %></em>
+                <% end %>
+              </span>
+            <% end %>
+          <% end %>
+        </div>
+      </section>
+
+      <%= turbo_frame_tag "decision_panel" do %>
+        <%= render "decision_panel", risk_case: @selected, score: @score %>
+      <% end %>
+    </div>
+  </main>
+</div>
