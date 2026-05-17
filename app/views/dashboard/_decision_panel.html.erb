@@ -1,0 +1,289 @@
+<% kyc_is_recent = risk_case[:kyc_l1_hours_before_withdrawal] < 36 %>
+<% first_deposit_is_recent = risk_case[:days_after_first_deposit] < 7 %>
+<% status_class = score["decision"].to_s %>
+
+<section
+  class="decision-stack"
+  data-controller="risk-refresh"
+  data-decision="<%= status_class %>"
+  data-risk-refresh-url-value="<%= score_path(risk_case[:id], locale: I18n.locale) %>">
+  <div class="panel profile-panel">
+    <div class="profile-head">
+      <div>
+        <span class="eyebrow"><%= risk_case[:request_id] %> · <%= risk_case[:id] %></span>
+        <h3><%= risk_case[:name] %></h3>
+        <p><%= risk_case[:email] %> · <%= risk_case[:registration_city] %>, <%= risk_case[:registration_country] %></p>
+      </div>
+
+      <div class="score-block">
+        <div class="score-circle" data-risk-refresh-target="meter" style="--score-fill: <%= score["risk_score"] %>%">
+          <span data-risk-refresh-target="score"><%= score["risk_score"] %></span>
+        </div>
+        <small><%= t("dashboard.auto_refresh") %></small>
+      </div>
+    </div>
+
+    <div class="decision-banner <%= status_class %>">
+      <div>
+        <span><%= t("dashboard.python_decision") %></span>
+        <strong data-risk-refresh-target="decision"><%= score["decision"] %></strong>
+      </div>
+      <div>
+        <span><%= t("dashboard.engine") %></span>
+        <strong data-risk-refresh-target="engine"><%= score["engine_status"] %></strong>
+      </div>
+      <div>
+        <span><%= t("dashboard.last_check") %></span>
+        <strong data-risk-refresh-target="checkedAt"><%= score["checked_at"] %></strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <article class="kpi-card">
+      <span><%= t("dashboard.kpis.trades") %></span>
+      <strong><%= risk_case[:trades_count] %></strong>
+      <small><%= risk_case[:active_days] %> <%= t("dashboard.active_days") %></small>
+    </article>
+    <article class="kpi-card">
+      <span><%= t("dashboard.kpis.volume") %></span>
+      <strong><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:trades_volume]) %></strong>
+      <small><%= t("dashboard.from_trading_api") %></small>
+    </article>
+    <article class="kpi-card warning">
+      <span><%= t("dashboard.kpis.withdrawal") %></span>
+      <strong><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:withdrawal_amount]) %></strong>
+      <small><%= risk_case[:withdrawal_method] %> · <%= risk_case[:withdrawal_destination] %></small>
+    </article>
+  </div>
+
+  <div class="support-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.client_context") %></h3>
+          <span><%= t("dashboard.client_context_note") %></span>
+        </div>
+      </div>
+
+      <div class="fact-grid">
+        <div>
+          <span><%= t("dashboard.registration_ip") %></span>
+          <strong><%= risk_case[:registration_ip] %></strong>
+          <small><%= risk_case[:registration_country] %></small>
+        </div>
+        <div>
+          <span><%= t("dashboard.withdrawal_geo") %></span>
+          <strong><%= risk_case[:withdrawal_geo] %></strong>
+          <small><%= risk_case[:withdrawal_method] %></small>
+        </div>
+        <div>
+          <span><%= t("dashboard.phone_bank") %></span>
+          <strong><%= risk_case[:phone_country] %> / <%= risk_case[:bank_country] %></strong>
+          <small><%= t("dashboard.country_match_check") %></small>
+        </div>
+        <div>
+          <span><%= t("dashboard.payment_pattern") %></span>
+          <strong><%= RiskCaseStore.localized(risk_case[:payment_attempts_pattern]) %></strong>
+          <small><%= t("dashboard.last_month") %></small>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.kyc_timing") %></h3>
+          <span><%= t("dashboard.kyc_note") %></span>
+        </div>
+      </div>
+
+      <div class="check-list">
+        <div class="check-card <%= risk_case[:kyc_level_2] ? 'success' : 'danger' %>">
+          <span><%= t("dashboard.kyc_l2") %></span>
+          <strong><%= risk_case[:kyc_level_2] ? t("common.yes") : t("common.no") %></strong>
+        </div>
+        <div class="check-card <%= risk_case[:deposits_before_kyc_l1] ? 'danger' : 'success' %>">
+          <span><%= t("dashboard.deposits_before_kyc") %></span>
+          <strong><%= risk_case[:deposits_before_kyc_l1] ? t("common.yes") : t("common.no") %></strong>
+        </div>
+        <div class="check-card <%= kyc_is_recent ? 'danger' : 'success' %>">
+          <span><%= t("dashboard.kyc_l1_before_withdrawal") %></span>
+          <strong><%= risk_case[:kyc_l1_hours_before_withdrawal] %>h</strong>
+          <% if kyc_is_recent %>
+            <small><%= t("dashboard.less_than_36h") %></small>
+          <% end %>
+        </div>
+        <div class="check-card <%= first_deposit_is_recent ? 'danger' : 'success' %>">
+          <span><%= t("dashboard.after_first_deposit") %></span>
+          <strong><%= risk_case[:days_after_first_deposit] %>d</strong>
+          <% if first_deposit_is_recent %>
+            <small><%= t("dashboard.less_than_week") %></small>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="support-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.deposit_methods") %></h3>
+          <span><%= t("dashboard.deposit_methods_note") %></span>
+        </div>
+      </div>
+
+      <% risk_case[:deposit_methods].each do |method| %>
+        <div class="method-row">
+          <div>
+            <strong><%= method[:label] %></strong>
+            <small><%= method[:note] %></small>
+          </div>
+          <b><%= method[:count] %></b>
+          <b><%= risk_case[:currency] %> <%= number_with_delimiter(method[:amount]) %></b>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="panel" id="operation-locks-section" data-controller="lock-toggle">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.operation_locks") %></h3>
+          <span><%= t("dashboard.operation_locks_note") %></span>
+        </div>
+        <span class="superadmin-pill"><%= t("dashboard.superadmin_mode") %></span>
+      </div>
+
+      <div class="lock-list">
+        <% %w[withdrawal deposits open_trades].each do |lock| %>
+          <% locked = risk_case[:locks].include?(lock) %>
+          <div class="lock-row <%= locked ? 'locked' : 'clear' %>" data-locked="<%= locked %>">
+            <div>
+              <span><%= t("locks.#{lock}") %></span>
+              <strong data-lock-toggle-target="status"><%= locked ? t("dashboard.locked") : t("dashboard.clear") %></strong>
+            </div>
+            <button
+              class="btn btn-sm <%= locked ? 'btn-outline-danger' : 'btn-outline-success' %>"
+              type="button"
+              data-action="lock-toggle#toggle"
+              data-lock-toggle-locked-param="<%= t("dashboard.locked") %>"
+              data-lock-toggle-clear-param="<%= t("dashboard.clear") %>"
+              data-lock-toggle-release-param="<%= t("dashboard.release_lock") %>"
+              data-lock-toggle-apply-param="<%= t("dashboard.apply_lock") %>">
+              <%= locked ? t("dashboard.release_lock") : t("dashboard.apply_lock") %>
+            </button>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" id="approval-flow-section">
+    <div class="panel-header">
+      <div>
+        <h3><%= t("dashboard.approval_flow") %></h3>
+        <span><%= t("dashboard.approval_note") %></span>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-sm btn-outline-secondary" type="button"><%= t("dashboard.request_more_info") %></button>
+        <button class="btn btn-sm btn-primary" type="button"><%= t("dashboard.superadmin_override") %></button>
+      </div>
+    </div>
+
+    <div class="approval-grid">
+      <% risk_case[:approvals].each do |approval| %>
+        <div class="approval-card <%= approval[:status].tr('_', '-') %>">
+          <span><%= approval[:role] %></span>
+          <strong><%= approval[:person] %></strong>
+          <small><%= t("approval_status.#{approval[:status]}") %></small>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="panel" id="risk-triggers-section">
+    <div class="panel-header">
+      <div>
+        <h3><%= t("dashboard.risk_triggers") %></h3>
+        <span><%= t("dashboard.risk_triggers_note") %></span>
+      </div>
+    </div>
+
+    <div class="trigger-grid">
+      <% risk_case[:triggers].each do |trigger| %>
+        <span class="trigger-pill"><%= t("triggers.#{trigger}", default: trigger.humanize) %></span>
+      <% end %>
+    </div>
+  </section>
+
+  <div class="support-grid">
+    <section class="panel" id="risk-rules-section">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.active_rules") %></h3>
+          <span><%= t("dashboard.active_rules_note") %></span>
+        </div>
+      </div>
+
+      <div class="rule-list">
+        <% %w[multi_registration geo_mismatch country_mismatch shared_instrument decreasing_failed_payments kyc_timing recent_security_change crypto_wallet_reuse].each do |rule| %>
+          <div><%= t("rules.#{rule}") %></div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="panel" id="intercom-section">
+      <div class="panel-header">
+        <div>
+          <h3><%= t("dashboard.intercom") %></h3>
+          <span><%= t("dashboard.intercom_note") %></span>
+        </div>
+      </div>
+
+      <div class="intercom-box">
+        <span><%= t("dashboard.support_alert") %></span>
+        <strong><%= RiskCaseStore.localized(risk_case[:intercom_alert]) %></strong>
+      </div>
+
+      <div class="access-list">
+        <div><span><%= t("roles.support") %></span><strong><%= t("access.support") %></strong></div>
+        <div><span><%= t("roles.risk") %></span><strong><%= t("access.risk") %></strong></div>
+        <div><span><%= t("roles.finance") %></span><strong><%= t("access.finance") %></strong></div>
+        <div><span><%= t("roles.superadmin") %></span><strong><%= t("access.superadmin") %></strong></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" id="month-history-section">
+    <div class="panel-header">
+      <div>
+        <h3><%= t("dashboard.month_history") %></h3>
+        <span><%= t("dashboard.month_history_note") %></span>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th><%= t("table.date") %></th>
+            <th><%= t("table.type") %></th>
+            <th><%= t("table.method") %></th>
+            <th><%= t("table.amount") %></th>
+            <th><%= t("table.status") %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% risk_case[:month_history].each do |event| %>
+            <tr class="<%= event.last.include?("manual") || event.last.include?("before") || event.last.include?("declined") || event.last.include?("foreign") || event.last.include?("shared") ? 'table-warning' : '' %>">
+              <% event.each do |cell| %>
+                <td><%= cell %></td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

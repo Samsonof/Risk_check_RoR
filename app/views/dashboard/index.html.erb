@@ -1,0 +1,108 @@
+<% content_for :title, "RiskOps Rails Prototype" %>
+<% blocked_count = @cases.count { |risk_case| risk_case[:locks].any? } %>
+<% pending_count = @cases.sum { |risk_case| risk_case[:approvals].count { |approval| approval[:status] == "pending" } } %>
+<% total_withdrawal = @cases.sum { |risk_case| risk_case[:withdrawal_amount] } %>
+
+<div class="app-shell" data-controller="section-nav">
+  <aside class="sidebar">
+    <div class="brand d-flex align-items-center gap-3">
+      <div class="brand-mark">RO</div>
+      <div>
+        <h1>RiskOps</h1>
+        <p><%= t("dashboard.stack") %></p>
+      </div>
+    </div>
+
+    <nav class="side-nav" aria-label="Risk workspace navigation">
+      <a class="active" href="#queue-section" data-section-nav-target="link"><%= t("dashboard.nav.queue") %></a>
+      <a href="#operation-locks-section" data-section-nav-target="link"><%= t("dashboard.nav.blocks") %></a>
+      <a href="#approval-flow-section" data-section-nav-target="link"><%= t("dashboard.nav.access") %></a>
+      <a href="#risk-rules-section" data-section-nav-target="link"><%= t("dashboard.nav.rules") %></a>
+      <a href="#intercom-section" data-section-nav-target="link"><%= t("dashboard.nav.intercom") %></a>
+      <a href="#month-history-section" data-section-nav-target="link"><%= t("dashboard.nav.history") %></a>
+    </nav>
+
+    <div class="sidebar-card">
+      <span class="label"><%= t("dashboard.stack") %></span>
+      <strong>Rails + Bootstrap</strong>
+      <small><%= t("dashboard.hotwire_note") %></small>
+    </div>
+
+    <div class="sidebar-card">
+      <span class="label"><%= t("dashboard.risk_engine") %></span>
+      <strong>Python API</strong>
+      <small><%= t("dashboard.python_note") %></small>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <span class="eyebrow"><%= t("dashboard.workspace") %></span>
+        <h2><%= t("dashboard.title") %></h2>
+        <p><%= t("dashboard.subtitle") %></p>
+      </div>
+
+      <div class="top-actions">
+        <div class="language-switch" aria-label="Language selector">
+          <% { en: "EN", es: "ES", ru: "RU" }.each do |locale, label| %>
+            <%= link_to label, url_for(request.query_parameters.merge(locale: locale)), class: ("active" if I18n.locale == locale) %>
+          <% end %>
+        </div>
+        <span class="status-dot"><%= t("dashboard.live") %></span>
+      </div>
+    </header>
+
+    <section class="ops-strip" aria-label="Operational summary">
+      <div>
+        <span><%= t("dashboard.summary.requests") %></span>
+        <strong><%= @cases.size %></strong>
+      </div>
+      <div>
+        <span><%= t("dashboard.summary.blocked") %></span>
+        <strong><%= blocked_count %></strong>
+      </div>
+      <div>
+        <span><%= t("dashboard.summary.pending") %></span>
+        <strong><%= pending_count %></strong>
+      </div>
+      <div>
+        <span><%= t("dashboard.summary.amount") %></span>
+        <strong><%= number_with_delimiter(total_withdrawal) %></strong>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <section class="panel queue-panel" id="queue-section">
+        <div class="panel-header">
+          <div>
+            <h3><%= t("dashboard.queue") %></h3>
+            <span><%= t("dashboard.queue_note") %></span>
+          </div>
+        </div>
+
+        <div class="client-list">
+          <% @cases.each do |risk_case| %>
+            <%= link_to case_panel_path(risk_case[:id], locale: I18n.locale), class: "client-item #{'active' if risk_case[:id] == @selected[:id]}", data: { turbo_frame: "decision_panel" } do %>
+              <b>
+                <span><%= risk_case[:name] %></span>
+                <span><%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:withdrawal_amount]) %></span>
+              </b>
+              <small><%= risk_case[:request_id] %> · <%= risk_case[:withdrawal_method] %></small>
+              <small><%= risk_case[:trades_count] %> <%= t("dashboard.trades") %> · <%= risk_case[:currency] %> <%= number_with_delimiter(risk_case[:trades_volume]) %></small>
+              <span class="queue-flags">
+                <% risk_case[:triggers].first(3).each do |trigger| %>
+                  <em><%= t("triggers.#{trigger}", default: trigger.humanize) %></em>
+                <% end %>
+              </span>
+            <% end %>
+          <% end %>
+        </div>
+      </section>
+
+      <%= turbo_frame_tag "decision_panel" do %>
+        <%= render "decision_panel", risk_case: @selected, score: @score %>
+      <% end %>
+    </div>
+  </main>
+</div>
