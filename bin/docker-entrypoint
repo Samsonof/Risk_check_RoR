@@ -6,4 +6,12 @@ if [ -z "${LD_PRELOAD+x}" ]; then
     export LD_PRELOAD
 fi
 
+# When the container is starting the Rails server, make sure the database
+# exists and is migrated/seeded. db:prepare creates+migrates+seeds when the
+# DB is missing (which happens on every cold Railway boot since the filesystem
+# is ephemeral) and runs only pending migrations otherwise.
+if [ "${1}" == "./bin/rails" ] && [ "${2}" == "server" ]; then
+    ./bin/rails db:prepare
+fi
+
 exec "${@}"
