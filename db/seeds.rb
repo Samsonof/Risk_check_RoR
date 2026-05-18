@@ -223,4 +223,126 @@ build_case!(now, fp,
   withdrawal: { request_id: "W-9109", amount_usd: 130, method: "bank", destination_label: "SPEI **** 4040",
                 origin_ip: "189.203.50.5", is_first_withdrawal: true, submitted_at: now - 2.hours })
 
-puts "Done: clients=#{Client.count}, withdrawals=#{WithdrawalRequest.count}, settings=#{Setting.count}, ops=#{Operator.count}, countries=#{CountryProfile.count}"
+# --- Bootstrap decisions ---------------------------------------------------
+# In production we may not always have the Python engine available (it's a
+# separate process). Pre-seed the same Decision rows the engine would produce
+# so the dashboard has data on a fresh boot. When the Python engine is
+# reachable, future /evaluate calls will write fresher rows and #latest_decision
+# picks the newest by decided_at — so these become history, not noise.
+#
+# Captured from a local end-to-end run of withdrawal-engine v1.0 (spec v10).
+
+BOOTSTRAP_DECISIONS = {
+  "W-9001" => { outcome: "auto_approve", score_pts: 0,  priority: nil,  reasons: [] },
+  "W-9002" => { outcome: "auto_approve", score_pts: 0,  priority: nil,  reasons: [] },
+  "W-9003" => { outcome: "auto_approve", score_pts: 0,  priority: nil,  reasons: [] },
+  "W-9101" => { outcome: "review", score_pts: 3,  priority: "P1", reasons: [
+    { block: 4, code: "new_ip",                message: "Request from new IP 200.5.5.5", pts: 0 },
+    { block: 5, code: "new_ip_pts",            message: "New IP at request time",        pts: 3 },
+    { block: 0, code: "first_method_mismatch", message: "First withdrawal method 'bank' differs from deposit method 'card'", pts: 0 },
+    { block: 0, code: "first_new_ip",          message: "First withdrawal from a new IP (≠ registration IP)", pts: 0 }
+  ] },
+  "W-9102" => { outcome: "review", score_pts: 13, priority: "P2", reasons: [
+    { block: 2, code: "deposit_too_recent",       message: "Last deposit was 14h ago, threshold is 24h", pts: 0 },
+    { block: 2, code: "low_trading_volume",       message: "Total trade volume $250 below $500", pts: 0 },
+    { block: 3, code: "new_destination",          message: "First withdrawal to this bank account", pts: 0 },
+    { block: 5, code: "near_cap",                 message: "Amount $180 > 80% of cap $200", pts: 3 },
+    { block: 5, code: "first_to_destination",     message: "First withdrawal to this destination", pts: 4 },
+    { block: 5, code: "over_half_same_day_deposit", message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 6, code: "carding_3plus_cards",      message: "3 different cards in 24h before withdrawal", pts: 0 },
+    { block: 6, code: "over_80pct_card_today",    message: "Withdrawal $180 > 80% of today's card deposits $215", pts: 0 }
+  ] },
+  "W-9103" => { outcome: "review", score_pts: 18, priority: "P3", reasons: [
+    { block: 2, code: "deposit_too_recent",       message: "Last deposit was 9h ago, threshold is 24h", pts: 0 },
+    { block: 2, code: "low_trading_volume",       message: "Total trade volume $300 below $500", pts: 0 },
+    { block: 3, code: "new_destination",          message: "First withdrawal to this crypto wallet", pts: 0 },
+    { block: 5, code: "first_to_destination",     message: "First withdrawal to this destination", pts: 4 },
+    { block: 5, code: "over_half_same_day_deposit", message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 5, code: "card_to_crypto",           message: "Card-funded → crypto/binance withdrawal (hardcoded high risk)", pts: 8 },
+    { block: 6, code: "over_80pct_card_today",    message: "Withdrawal $220 > 80% of today's card deposits $250", pts: 0 }
+  ] },
+  "W-9104" => { outcome: "review", score_pts: 10, priority: "P4", reasons: [
+    { block: 2, code: "deposit_too_recent",            message: "Last deposit was 0h ago, threshold is 24h", pts: 0 },
+    { block: 2, code: "low_trading_volume",            message: "Total trade volume $400 below $500", pts: 0 },
+    { block: 3, code: "new_destination",               message: "First withdrawal to this bank account", pts: 0 },
+    { block: 5, code: "first_to_destination",          message: "First withdrawal to this destination", pts: 4 },
+    { block: 5, code: "over_half_same_day_deposit",    message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 6, code: "withdrawal_within_hour_of_card", message: "Withdrawal 25min after a card deposit", pts: 0 },
+    { block: 6, code: "over_80pct_card_today",         message: "Withdrawal $280 > 80% of today's card deposits $300", pts: 0 }
+  ] },
+  "W-9105" => { outcome: "review", score_pts: 3,  priority: "P5", reasons: [
+    { block: 1, code: "single_amount_over_cap", message: "Amount $600 exceeds single-tx cap $500 (Tier 2 / country override)", pts: 0 },
+    { block: 1, code: "global_24h_amount",      message: "24h sum $600 exceeds global 24h cap $500", pts: 0 },
+    { block: 5, code: "near_cap",               message: "Amount $600 > 80% of cap $500", pts: 3 }
+  ] },
+  "W-9106" => { outcome: "review", score_pts: 3,  priority: "P7", reasons: [
+    { block: 1, code: "single_amount_over_cap", message: "Amount $250 exceeds single-tx cap $200 (Tier 2 / country override)", pts: 0 },
+    { block: 5, code: "near_cap",               message: "Amount $250 > 80% of cap $200", pts: 3 }
+  ] },
+  "W-9107" => { outcome: "review", score_pts: 23, priority: "P7", reasons: [
+    { block: 2, code: "deposit_too_recent",         message: "Last deposit was 8h ago, threshold is 24h", pts: 0 },
+    { block: 2, code: "low_trading_volume",         message: "Total trade volume $0 below $500", pts: 0 },
+    { block: 3, code: "new_destination",            message: "First withdrawal to this crypto wallet", pts: 0 },
+    { block: 5, code: "first_to_destination",       message: "First withdrawal to this destination", pts: 4 },
+    { block: 5, code: "over_half_same_day_deposit", message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 5, code: "no_trading",                 message: "Withdrawal with zero trading activity", pts: 6 },
+    { block: 5, code: "crypto_transit",             message: "Crypto→crypto with negligible trading activity", pts: 7 },
+    { block: 6, code: "crypto_transit_review",      message: "Crypto-in → crypto-out with negligible trading", pts: 0 }
+  ] },
+  "W-9108" => { outcome: "review", score_pts: 11, priority: "P1", reasons: [
+    { block: 2, code: "account_too_young",          message: "Account age 0d < min 3d", pts: 0 },
+    { block: 2, code: "deposit_too_recent",         message: "Last deposit was 6h ago, threshold is 24h", pts: 0 },
+    { block: 5, code: "young_account",              message: "Account younger than 7d (0d)", pts: 5 },
+    { block: 5, code: "over_half_same_day_deposit", message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 6, code: "over_80pct_card_today",      message: "Withdrawal $80 > 80% of today's card deposits $90", pts: 0 },
+    { block: 0, code: "first_method_mismatch",      message: "First withdrawal method 'bank' differs from deposit method 'card'", pts: 0 },
+    { block: 0, code: "first_too_soon_after_deposit", message: "First withdrawal less than 24h after deposit", pts: 0 }
+  ] },
+  "W-9109" => { outcome: "review", score_pts: 17, priority: "P1", reasons: [
+    { block: 1, code: "tier0_no_withdrawal",          message: "Tier 0 client cannot withdraw", pts: 0 },
+    { block: 2, code: "deposit_too_recent",           message: "Last deposit was 22h ago, threshold is 24h", pts: 0 },
+    { block: 5, code: "young_account",                message: "Account younger than 7d (3d)", pts: 5 },
+    { block: 5, code: "over_half_same_day_deposit",   message: "Withdrawal > 50% of today's deposit", pts: 6 },
+    { block: 5, code: "no_trading",                   message: "Withdrawal with zero trading activity", pts: 6 },
+    { block: 6, code: "over_80pct_card_today",        message: "Withdrawal $130 > 80% of today's card deposits $150", pts: 0 },
+    { block: 0, code: "first_over_cap",               message: "First-withdrawal amount $130 > cap $100", pts: 0 },
+    { block: 0, code: "first_method_mismatch",        message: "First withdrawal method 'bank' differs from deposit method 'card'", pts: 0 },
+    { block: 0, code: "first_too_soon_after_deposit", message: "First withdrawal less than 24h after deposit", pts: 0 },
+    { block: 0, code: "first_no_trades",              message: "First withdrawal with only 0 closed trades (need 1)", pts: 0 }
+  ] }
+}.freeze
+
+# Derive block_results from reasons so the case detail page renders the 6-block ladder.
+def derive_block_results(reasons, score_pts)
+  blocks = (1..6).to_h { |n| [n, { passed: true, reasons_count: 0, score_pts: 0 }] }
+  policy_reasons = 0
+  reasons.each do |r|
+    if r[:block].to_i.zero?
+      policy_reasons += 1
+    elsif (b = r[:block].to_i).between?(1, 6)
+      blocks[b][:passed] = false
+      blocks[b][:reasons_count] += 1
+    end
+  end
+  blocks[5][:score_pts] = score_pts.to_i
+  out = blocks.transform_keys { |n| "block#{n}" }
+  out["first_withdrawal_policy"] = { passed: policy_reasons.zero?, reasons_count: policy_reasons }
+  out
+end
+
+puts "Bootstrapping decisions..."
+BOOTSTRAP_DECISIONS.each do |req_id, payload|
+  wr = WithdrawalRequest.find_by(request_id: req_id)
+  next unless wr && wr.decisions.empty?
+  wr.decisions.create!(
+    outcome:           payload[:outcome],
+    score_pts:         payload[:score_pts],
+    priority:          payload[:priority],
+    reasons_json:      payload[:reasons].to_json,
+    block_results_json: derive_block_results(payload[:reasons], payload[:score_pts]).to_json,
+    engine_version:    "bootstrap (spec v10 seeded; will be overridden by Python engine on next /evaluate)",
+    decided_at:        Time.zone.now
+  )
+end
+
+puts "Done: clients=#{Client.count}, withdrawals=#{WithdrawalRequest.count}, settings=#{Setting.count}, ops=#{Operator.count}, countries=#{CountryProfile.count}, decisions=#{Decision.count}"
