@@ -1,0 +1,236 @@
+<% content_for :title, "#{@wr.request_id} · #{@wr.client.name}" %>
+
+<% client    = @wr.client %>
+<% decision  = @decision %>
+<% priority  = decision&.priority %>
+<% reasons   = decision&.reasons || [] %>
+<% blocks    = decision&.block_results || {} %>
+<% country   = client.country %>
+<% auto      = decision&.outcome == "auto_approve" %>
+<% resolved  = @wr.operator_decision %>
+
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <div class="flex flex-wrap items-center gap-3">
+    <%= link_to "← Queue", root_path, class: "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" %>
+    <h1 class="text-xl font-semibold text-slate-900"><%= @wr.request_id %> · <%= client.name %></h1>
+    <% if auto %>
+      <span class="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">Auto-approved</span>
+    <% elsif resolved %>
+      <span class="rounded-full <%= resolved.action == 'approved' ? 'bg-emerald-500' : 'bg-rose-500' %> px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+        <%= resolved.action %> by <%= resolved.operator.name %>
+      </span>
+    <% elsif priority %>
+      <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide <%= priority_chip(priority) %>"><%= priority_label(priority) %></span>
+    <% end %>
+  </div>
+  <%= button_to "Re-evaluate", evaluate_case_path(@wr), method: :post, class: "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50", form: { data: { turbo: false } } %>
+</div>
+
+<div class="grid grid-cols-12 gap-4">
+  <%# 1. Top metrics card %>
+  <section class="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-5">
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Amount</p>
+      <p class="mt-1 text-base font-semibold text-slate-900"><%= money(@wr.amount_usd) %></p>
+      <p class="text-xs text-slate-500"><%= method_icon(@wr.method) %> <%= @wr.method %></p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Country</p>
+      <p class="mt-1 text-base font-semibold text-slate-900"><%= country&.name || client.country_code %></p>
+      <p class="text-xs text-slate-500">limit <%= money(country&.max_single_usd) %> single · <%= country&.preferred_method %></p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">KYC tier</p>
+      <p class="mt-1 text-base font-semibold text-slate-900">T<%= client.kyc_tier %></p>
+      <p class="text-xs text-slate-500"><%= Client::KYC_TIERS[client.kyc_tier] %></p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Score</p>
+      <p class="mt-1 text-base font-semibold <%= (decision&.score_pts || 0) >= 10 ? 'text-rose-600' : 'text-slate-900' %>"><%= decision&.score_pts || 0 %> pts</p>
+      <p class="text-xs text-slate-500">threshold <%= Setting.get('scoring_threshold_pts', 10).to_i %> pts</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Account age</p>
+      <p class="mt-1 text-base font-semibold text-slate-900"><%= client.account_age_days %> days</p>
+      <p class="text-xs text-slate-500">in queue <%= time_in_queue_label(@wr.time_in_queue_hours) %></p>
+    </div>
+  </section>
+
+  <%# 2. Six-block ladder %>
+  <section class="col-span-12 rounded-xl border border-slate-200 bg-white p-4">
+    <h3 class="mb-3 text-sm font-semibold text-slate-900">Block ladder — what the engine checked</h3>
+    <div class="grid gap-2 md:grid-cols-7">
+      <% (1..6).each do |n| %>
+        <% b = blocks["block#{n}"] || { "passed" => true, "reasons_count" => 0, "score_pts" => 0 } %>
+        <% passed = b["passed"] %>
+        <div class="rounded-lg border <%= passed ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50' %> p-2 text-center">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Block <%= n %></p>
+          <p class="mt-0.5 text-xs font-medium text-slate-700"><%= humanize_block(n) %></p>
+          <p class="mt-1 text-[11px] font-semibold <%= passed ? 'text-emerald-700' : 'text-rose-700' %>">
+            <%= passed ? "✓ passed" : "✗ #{b['reasons_count']} signal#{'s' if b['reasons_count'] != 1}" %>
+          </p>
+          <% if n == 5 %>
+            <p class="text-[10px] text-slate-500"><%= b['score_pts'] %> pts</p>
+          <% end %>
+        </div>
+      <% end %>
+      <% pol = blocks["first_withdrawal_policy"] %>
+      <% if pol %>
+        <div class="rounded-lg border <%= pol['passed'] ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50' %> p-2 text-center">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Policy</p>
+          <p class="mt-0.5 text-xs font-medium text-slate-700">First withdrawal</p>
+          <p class="mt-1 text-[11px] font-semibold <%= pol['passed'] ? 'text-emerald-700' : 'text-rose-700' %>">
+            <%= pol['passed'] ? "✓ ok" : "✗ #{pol['reasons_count']}" %>
+          </p>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# 3. Reasons %>
+  <section class="col-span-12 lg:col-span-7 rounded-xl border border-slate-200 bg-white p-4">
+    <h3 class="mb-3 text-sm font-semibold text-slate-900">Reasons — all signals on this request</h3>
+    <% if reasons.empty? %>
+      <p class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">No signals fired. The engine auto-approved this request.</p>
+    <% else %>
+      <ul class="space-y-2">
+        <% reasons.each do |r| %>
+          <% pts = r["pts"].to_i %>
+          <% is_scoring = r["block"].to_i == 5 %>
+          <% bcolor = case r["block"].to_i
+                     when 1 then "bg-rose-100 text-rose-700"
+                     when 2 then "bg-amber-100 text-amber-700"
+                     when 3 then "bg-indigo-100 text-indigo-700"
+                     when 4 then "bg-purple-100 text-purple-700"
+                     when 5 then "bg-orange-100 text-orange-700"
+                     when 6 then "bg-pink-100 text-pink-700"
+                     else        "bg-slate-100 text-slate-700"
+                     end %>
+          <li class="flex items-start gap-3 rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+            <span class="rounded px-1.5 py-0.5 text-[10px] font-bold <%= bcolor %>">B<%= r["block"] %></span>
+            <div class="flex-1">
+              <p class="text-sm text-slate-800"><%= r["message"] %></p>
+              <p class="text-[11px] font-mono text-slate-500"><%= r["code"] %></p>
+            </div>
+            <% if is_scoring && pts > 0 %>
+              <span class="rounded bg-orange-200 px-1.5 py-0.5 text-[10px] font-bold text-orange-900">+<%= pts %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# 4. Client & withdrawal panel %>
+  <aside class="col-span-12 lg:col-span-5 space-y-4">
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Client</h3>
+      <dl class="grid grid-cols-2 gap-2 text-sm">
+        <dt class="text-slate-500">ID</dt><dd class="font-medium text-slate-900"><%= client.external_id %></dd>
+        <dt class="text-slate-500">Name</dt><dd class="font-medium text-slate-900"><%= client.name %></dd>
+        <dt class="text-slate-500">Email</dt><dd class="font-medium text-slate-900"><%= client.email %></dd>
+        <dt class="text-slate-500">Registered</dt><dd class="font-medium text-slate-900"><%= client.registered_at.strftime("%Y-%m-%d") %></dd>
+        <dt class="text-slate-500">Reg IP</dt><dd class="font-mono text-xs text-slate-900"><%= client.registration_ip %></dd>
+      </dl>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Withdrawal target</h3>
+      <dl class="grid grid-cols-2 gap-2 text-sm">
+        <dt class="text-slate-500">Method</dt><dd class="font-medium text-slate-900"><%= method_icon(@wr.method) %> <%= @wr.method %></dd>
+        <dt class="text-slate-500">Destination</dt><dd class="font-medium text-slate-900"><%= @wr.destination_label %></dd>
+        <dt class="text-slate-500">Holder</dt><dd class="font-medium text-slate-900"><%= @wr.destination_holder_name || "—" %></dd>
+        <dt class="text-slate-500">Origin IP</dt><dd class="font-mono text-xs text-slate-900"><%= @wr.origin_ip %></dd>
+        <dt class="text-slate-500">First withdrawal?</dt><dd class="font-medium <%= @wr.is_first_withdrawal? ? 'text-rose-700' : 'text-slate-900' %>"><%= @wr.is_first_withdrawal? ? "Yes" : "No" %></dd>
+        <dt class="text-slate-500">Submitted</dt><dd class="font-medium text-slate-900"><%= @wr.submitted_at.strftime("%Y-%m-%d %H:%M") %></dd>
+      </dl>
+    </div>
+  </aside>
+
+  <%# 5. Deposit history %>
+  <section class="col-span-12 lg:col-span-6 rounded-xl border border-slate-200 bg-white p-4">
+    <h3 class="mb-2 text-sm font-semibold text-slate-900">Deposit history (30d)</h3>
+    <% if client.deposits.empty? %>
+      <p class="text-xs text-slate-500">No deposits.</p>
+    <% else %>
+      <ul class="divide-y divide-slate-100 text-sm">
+        <% client.deposits.limit(8).each do |d| %>
+          <li class="flex items-center justify-between gap-3 py-1.5">
+            <span class="text-xs text-slate-500"><%= d.occurred_at.strftime("%b %d %H:%M") %></span>
+            <span class="flex-1 text-slate-800"><%= method_icon(d.method) %> <%= d.instrument_label %></span>
+            <span class="font-semibold text-slate-900"><%= money(d.amount_usd) %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# 6. Prior withdrawals + trading %>
+  <section class="col-span-12 lg:col-span-6 space-y-4">
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Prior withdrawals</h3>
+      <% if client.previous_withdrawals.empty? %>
+        <p class="text-xs text-slate-500">No prior withdrawals (first one).</p>
+      <% else %>
+        <ul class="divide-y divide-slate-100 text-sm">
+          <% client.previous_withdrawals.limit(6).each do |w| %>
+            <li class="flex items-center justify-between gap-3 py-1.5">
+              <span class="text-xs text-slate-500"><%= w.occurred_at.strftime("%b %d") %></span>
+              <span class="flex-1 text-slate-800"><%= method_icon(w.method) %> <%= w.method %></span>
+              <span class="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"><%= w.status %></span>
+              <span class="font-semibold text-slate-900"><%= money(w.amount_usd) %></span>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Trading activity</h3>
+      <% sum = client.trades.sum(:volume_usd) %>
+      <% cnt = client.trades.count %>
+      <p class="text-sm text-slate-700"><span class="font-semibold text-slate-900"><%= cnt %></span> closed trades · <span class="font-semibold text-slate-900"><%= money(sum) %></span> total volume</p>
+      <% if cnt > 0 %>
+        <p class="text-xs text-slate-500">last: <%= client.trades.first.closed_at.strftime("%Y-%m-%d") %></p>
+      <% end %>
+    </div>
+  </section>
+
+  <%# 7. Operator decision %>
+  <section class="col-span-12 rounded-xl border-2 border-slate-300 bg-white p-4 shadow-sm">
+    <% if resolved %>
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Operator decision</h3>
+      <p class="mb-1 text-sm">
+        <strong><%= resolved.operator.name %></strong> ·
+        <span class="rounded-full <%= resolved.action == 'approved' ? 'bg-emerald-500' : 'bg-rose-500' %> px-2 py-0.5 text-[11px] font-semibold uppercase text-white"><%= resolved.action %></span>
+        · <span class="text-xs text-slate-500"><%= resolved.acted_at.strftime("%Y-%m-%d %H:%M") %></span>
+      </p>
+      <p class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"><%= resolved.comment %></p>
+    <% elsif auto %>
+      <p class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Engine auto-approved this request. No operator decision needed.</p>
+    <% else %>
+      <h3 class="mb-2 text-sm font-semibold text-slate-900">Your decision</h3>
+      <p class="mb-2 text-xs text-slate-500">Acting as <strong><%= current_operator&.name %></strong> (<%= current_operator&.role_label %>). Comment is mandatory.</p>
+      <%= form_with url: decide_case_path(@wr), method: :post, data: { turbo: false }, class: "grid gap-2 md:grid-cols-[1fr_auto_auto]" do %>
+        <textarea name="comment" rows="2" placeholder="Comment (e.g. 'KYC L2 confirmed via support call, sum matches deposit')" required
+                  class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+        <button type="submit" name="choice" value="approve" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Approve</button>
+        <button type="submit" name="choice" value="reject"  class="rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Reject</button>
+      <% end %>
+    <% end %>
+  </section>
+
+  <%# 8. Audit trail %>
+  <section class="col-span-12 rounded-xl border border-slate-200 bg-white p-4">
+    <h3 class="mb-2 text-sm font-semibold text-slate-900">Engine audit trail</h3>
+    <ul class="divide-y divide-slate-100 text-xs">
+      <% @wr.decisions.limit(8).each do |d| %>
+        <li class="flex items-center justify-between gap-2 py-1.5">
+          <span class="text-slate-500"><%= d.decided_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+          <span class="font-mono text-slate-700"><%= d.engine_version %></span>
+          <span class="font-semibold text-slate-900"><%= d.score_pts %> pts</span>
+          <span class="rounded-full <%= d.outcome == 'auto_approve' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' %> px-2 py-0.5 text-[10px] font-semibold uppercase"><%= d.outcome %><%= " #{d.priority}" if d.priority %></span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+</div>

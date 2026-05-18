@@ -4,7 +4,7 @@ require "rails"
 # Pick the frameworks you want:
 require "active_model/railtie"
 require "active_job/railtie"
-# require "active_record/railtie"
+require "active_record/railtie"
 # require "active_storage/engine"
 require "action_controller/railtie"
 # require "action_mailer/railtie"
@@ -35,8 +35,13 @@ module RiskRailsPrototype
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
-    config.i18n.available_locales = %i[en es ru]
     config.i18n.default_locale = :en
+    config.active_record.sqlite3_adapter_strict_strings_by_default = false
+
+    # Use a single session-wide CSRF token rather than per-(URL,method) tokens.
+    # The default per-form variant breaks when a single form has buttons that
+    # POST to different routes (we used that for approve/reject and it 422'd).
+    config.action_controller.per_form_csrf_tokens = false
 
     # Don't generate system test files.
     config.generators.system_tests = nil

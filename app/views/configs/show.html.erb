@@ -1,0 +1,103 @@
+<% content_for :title, "Configuration" %>
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Engine config</p>
+    <h1 class="text-2xl font-semibold text-slate-900">Parameters &amp; toggles</h1>
+    <p class="mt-1 text-sm text-slate-500">All changes take effect after saving — every withdrawal request is re-evaluated.</p>
+  </div>
+  <%= button_to "Re-evaluate everything", reevaluate_all_config_path, method: :post,
+        class: "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50",
+        form: { data: { turbo: false } } %>
+</div>
+
+<%= form_with url: config_path, method: :patch, data: { turbo: false }, class: "space-y-6" do |f| %>
+  <%# Main lever %>
+  <section class="rounded-xl border-2 border-indigo-300 bg-indigo-50/40 p-5">
+    <div class="flex items-end justify-between gap-4 flex-wrap">
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">Main lever</p>
+        <h2 class="text-lg font-semibold text-slate-900">Scoring threshold (Block 5)</h2>
+        <p class="text-sm text-slate-600">15 = soft (40–50% auto), 10 = standard (20–30%), 6 = strict (5–10%), 1 = nearly manual.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <% [15, 10, 6, 1].each do |val| %>
+          <label class="flex flex-col items-center gap-1 cursor-pointer">
+            <input type="radio" name="settings[scoring_threshold_pts]" value="<%= val %>" <%= 'checked' if @threshold.parsed_value.to_i == val %>>
+            <span class="text-xl font-bold text-slate-900"><%= val %></span>
+            <span class="text-[10px] uppercase tracking-wide text-slate-500"><%= ["soft","standard","strict","manual"][[15,10,6,1].index(val)] %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <%# Numeric tunables %>
+  <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <h2 class="mb-3 text-base font-semibold text-slate-900">Numeric parameters</h2>
+    <div class="grid gap-3 md:grid-cols-2">
+      <% @tunables.reject { |s| s.key == 'scoring_threshold_pts' }.each do |s| %>
+        <label class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
+          <span class="flex flex-col">
+            <span class="text-sm font-medium text-slate-900"><%= s.description %></span>
+            <span class="text-[11px] font-mono text-slate-500"><%= s.key %></span>
+          </span>
+          <input type="number" name="settings[<%= s.key %>]" value="<%= s.value %>" step="any"
+                 class="w-32 rounded-md border border-slate-300 px-2 py-1 text-sm text-right focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </label>
+      <% end %>
+    </div>
+  </section>
+
+  <%# Toggles %>
+  <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <h2 class="mb-3 text-base font-semibold text-slate-900">Block &amp; rule toggles</h2>
+    <div class="grid gap-2 md:grid-cols-2">
+      <% @toggles.each do |s| %>
+        <label class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
+          <span class="flex flex-col">
+            <span class="text-sm font-medium text-slate-900"><%= s.description %></span>
+            <span class="text-[11px] font-mono text-slate-500"><%= s.key %></span>
+          </span>
+          <%# hidden field ensures we receive false when unchecked %>
+          <input type="hidden" name="settings[<%= s.key %>]" value="false">
+          <input type="checkbox" name="settings[<%= s.key %>]" value="true" <%= 'checked' if s.parsed_value %>
+                 class="h-5 w-9 appearance-none rounded-full bg-slate-300 relative checked:bg-indigo-600 transition-colors before:absolute before:top-0.5 before:left-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4 cursor-pointer">
+        </label>
+      <% end %>
+    </div>
+  </section>
+
+  <%# Country limits — read-only for now %>
+  <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <h2 class="mb-3 text-base font-semibold text-slate-900">Country limits</h2>
+    <p class="mb-3 text-xs text-slate-500">Country-specific overrides take precedence over global limits (Block 1).</p>
+    <table class="min-w-full text-sm">
+      <thead class="text-[11px] uppercase tracking-wider text-slate-500">
+        <tr>
+          <th class="px-2 py-1 text-left">Country</th>
+          <th class="px-2 py-1 text-left">Preferred method</th>
+          <th class="px-2 py-1 text-right">Max single</th>
+          <th class="px-2 py-1 text-right">Max 24h</th>
+          <th class="px-2 py-1 text-right">Max tx / 24h</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <% @country_profiles.each do |c| %>
+          <tr>
+            <td class="px-2 py-1 font-medium text-slate-900"><%= c.code %> · <%= c.name %></td>
+            <td class="px-2 py-1 text-slate-700"><%= c.preferred_method %></td>
+            <td class="px-2 py-1 text-right font-mono">$<%= c.max_single_usd %></td>
+            <td class="px-2 py-1 text-right font-mono">$<%= c.max_24h_usd %></td>
+            <td class="px-2 py-1 text-right font-mono"><%= c.max_24h_count %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", config_path, class: "rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" %>
+    <%= f.submit "Save & re-evaluate", class: "rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 cursor-pointer" %>
+  </div>
+<% end %>

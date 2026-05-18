@@ -1,0 +1,55 @@
+<header class="border-b border-slate-200 bg-white">
+  <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3">
+    <div class="flex items-center gap-3">
+      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white text-sm font-bold tracking-tight">W</div>
+      <div>
+        <%= link_to "Withdrawal Decision Engine", root_path, class: "text-base font-semibold text-slate-900 hover:text-slate-700" %>
+        <p class="text-xs text-slate-500 leading-tight">LatAm · MX / CO / AR / CL / PE</p>
+      </div>
+    </div>
+
+    <nav class="hidden gap-6 text-sm font-medium text-slate-600 md:flex">
+      <%= link_to "Review queue",   root_path,         class: "hover:text-slate-900 #{'text-slate-900 underline underline-offset-4' if controller_name == 'queue' && action_name == 'index'}" %>
+      <%= link_to "Auto-approved",  auto_approved_path, class: "hover:text-slate-900 #{'text-slate-900 underline underline-offset-4' if action_name == 'auto_approved'}" %>
+      <%= link_to "Configuration",  config_path,       class: "hover:text-slate-900 #{'text-slate-900 underline underline-offset-4' if controller_name == 'configs'}" %>
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <details class="relative" data-controller="dropdown">
+        <summary class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm hover:border-slate-300">
+          <span class="flex h-7 w-7 items-center justify-center rounded-full <%= current_operator&.superadmin? ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700' %> text-xs font-semibold">
+            <%= current_operator&.avatar_initials || "?" %>
+          </span>
+          <span class="flex flex-col leading-tight text-left">
+            <span class="font-medium text-slate-900"><%= current_operator&.name || "Guest" %></span>
+            <span class="text-[11px] uppercase tracking-wide text-slate-500"><%= current_operator&.role_label %></span>
+          </span>
+        </summary>
+        <div class="absolute right-0 z-10 mt-1 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+          <p class="border-b border-slate-100 px-3 py-2 text-[11px] uppercase tracking-wide text-slate-500">Switch operator</p>
+          <% all_operators.each do |op| %>
+            <%= button_to personas_path(operator_id: op.id), method: :post, form: { data: { turbo: false } },
+                  class: "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 #{'bg-indigo-50' if op.id == current_operator&.id}" do %>
+              <span class="flex items-center gap-2">
+                <span class="flex h-6 w-6 items-center justify-center rounded-full <%= op.superadmin? ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-200 text-slate-700' %> text-[10px] font-semibold"><%= op.avatar_initials %></span>
+                <span class="flex flex-col leading-tight">
+                  <span class="font-medium text-slate-900"><%= op.name %></span>
+                  <span class="text-[11px] text-slate-500"><%= op.role_label %></span>
+                </span>
+              </span>
+              <% if op.id == current_operator&.id %>
+                <span class="text-[11px] font-semibold uppercase text-indigo-600">Active</span>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+      </details>
+
+      <% engine_online = (@engine_health || EngineClient.health)["status"] == "ok" %>
+      <span class="inline-flex items-center gap-1.5 rounded-full border <%= engine_online ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700' %> px-2 py-1 text-[11px] font-semibold uppercase tracking-wide">
+        <span class="h-1.5 w-1.5 rounded-full <%= engine_online ? 'bg-emerald-500' : 'bg-rose-500' %>"></span>
+        Engine <%= engine_online ? 'online' : 'offline' %>
+      </span>
+    </div>
+  </div>
+</header>

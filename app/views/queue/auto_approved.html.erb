@@ -1,0 +1,41 @@
+<% content_for :title, "Auto-approved" %>
+
+<div class="mb-6">
+  <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Workspace</p>
+  <h1 class="text-2xl font-semibold text-slate-900">Auto-approved withdrawals</h1>
+  <p class="mt-1 text-sm text-slate-500">Cleared by the engine without human intervention. Spot-check anything that looks off.</p>
+</div>
+
+<% if @auto_approved.empty? %>
+  <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No auto-approved cases yet.</div>
+<% else %>
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
+        <tr>
+          <th class="px-4 py-2 text-left">Request</th>
+          <th class="px-4 py-2 text-left">Client</th>
+          <th class="px-4 py-2 text-left">Country / KYC</th>
+          <th class="px-4 py-2 text-left">Method</th>
+          <th class="px-4 py-2 text-right">Amount</th>
+          <th class="px-4 py-2 text-left">Decided</th>
+          <th class="px-4 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <% @auto_approved.each do |wr| %>
+          <% d = wr.latest_decision %>
+          <tr class="hover:bg-emerald-50/30">
+            <td class="px-4 py-2 font-mono text-xs"><%= wr.request_id %></td>
+            <td class="px-4 py-2"><%= wr.client.name %><br><span class="text-xs text-slate-500"><%= wr.client.external_id %></span></td>
+            <td class="px-4 py-2"><%= wr.client.country_code %> · T<%= wr.client.kyc_tier %></td>
+            <td class="px-4 py-2"><%= method_icon(wr.method) %> <%= wr.method %></td>
+            <td class="px-4 py-2 text-right font-semibold"><%= money(wr.amount_usd) %></td>
+            <td class="px-4 py-2 text-xs text-slate-500"><%= d&.decided_at&.strftime("%H:%M:%S") %></td>
+            <td class="px-4 py-2 text-right"><%= link_to "Open →", case_path(wr), class: "text-xs text-indigo-600 hover:underline" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

@@ -6,6 +6,10 @@
 
 # Ignore bundler config.
 /.bundle
+/vendor/bundle
+
+# Python venv for the risk engine
+/risk_engine/.venv
 
 .DS_Store
 __pycache__/
@@ -36,3 +40,6 @@ __pycache__/
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+
+/app/assets/builds/*
+!/app/assets/builds/.keep
