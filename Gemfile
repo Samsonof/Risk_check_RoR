@@ -7,7 +7,7 @@ gem "puma", ">= 5.0"
 gem "importmap-rails"
 gem "turbo-rails"
 gem "stimulus-rails"
-gem "tailwindcss-rails", "~> 3.0"
+gem "tailwindcss-rails", "~> 4.4"
 gem "tzinfo-data", platforms: %i[windows jruby]
 gem "bootsnap", require: false
 
